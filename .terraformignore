@@ -1,0 +1,7 @@
+.terraformignore
+
+k8s-streaming/terraform/.terraform/
+k8s-streaming/terraform/*.lock.*
+k8s-streaming/terraform/*.yaml
+k8s-streaming/terraform/*.tfstate
+k8s-streaming/terraform/*.tfstate.*

@@ -1,0 +1,5 @@
+.helmignore
+
+k8s-streaming/helm/streaming/templates/ignore-*.yaml
+k8s-streaming/helm/streaming/templates/ignore-*.yml
+

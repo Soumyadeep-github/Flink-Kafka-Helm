@@ -1,0 +1,52 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IntelliJ IDEA ###
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+*.zip
+*.tgz
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+k8s-streaming/helm/streaming/templates/ignore-*.yaml
+k8s-streaming/helm/streaming/templates/ignore-*.yml
+
+k8s-streaming/terraform/.terraform/
+k8s-streaming/terraform/*.lock.*
+k8s-streaming/terraform/*.yaml
+k8s-streaming/terraform/*.tfstate
+k8s-streaming/terraform/*.tfstate.*
+
+.idea
+
+
+### Mac OS ###
+.DS_Store

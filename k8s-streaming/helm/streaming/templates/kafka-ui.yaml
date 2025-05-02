@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.kafka.applicationName }}
+  namespace: {{ .Values.namespace }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.kafka.applicationName }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.kafkaUI.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.kafka.applicationName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.kafka.applicationName }}
+    spec:
+      serviceAccountName: {{ .Values.kafka.applicationName }}
+      containers:
+        - name: {{ .Values.kafka.applicationName }}
+          image: "{{ .Values.kafkaUI.image }}"
+          env:
+            - name: KAFKA_CLUSTERS_0_NAME
+              value: "{{ .Release.Name }}-cluster"
+            - name: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS
+              value: "{{ .Release.Name }}-cluster-kafka-bootstrap.{{ .Values.namespace }}:9092"
+          ports:
+            - containerPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.kafka.applicationName }}
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: {{ .Values.kafka.applicationName }}
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080

@@ -1,0 +1,51 @@
+namespace: streaming
+
+k8s:
+  rbac:
+    apiName: rbac.authorization.k8s.io/v1
+
+kafka:
+  applicationName: kafka-ui
+  replicas: 3
+  zookeeperReplicas: 3
+  version: 3.9.0
+  config:
+    minInSyncReplicas: 2
+    defaultReplicationFactor: 3
+    offsetsTopicReplicationFactor: 3
+  topic:
+    name: input-topic
+    partitions: 1
+    replicas: 1
+
+flinkSession:
+  haRole:
+    name: flink-session-ha
+  serviceAccount:
+    create: true
+    name: streaming-session-sa
+  image: flink:1.17
+  flinkVersion: v1_17
+  jobManager:
+    memory: "1024m"
+    cpu: 1
+  taskManager:
+    memory: "1024m"
+    cpu: 1
+  taskSlots: 2
+  ha:
+    storageVolumeName: flink-ha
+    storageDir: "file:///tmp/flink-ha"
+    storageMountPath: "/tmp/flink-ha"
+    storageUri: "file:///tmp/flink-ha"
+  pvc:
+    name: flink-ha-pvc
+    size: 1Gi
+
+kafkaUI:
+  replicas: 1
+  image: provectuslabs/kafka-ui:latest
+
+
+flinkUI:
+  enabled: true

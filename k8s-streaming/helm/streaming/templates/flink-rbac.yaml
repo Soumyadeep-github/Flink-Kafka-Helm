@@ -1,0 +1,29 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: flink-session-ha
+  namespace: streaming
+rules:
+  # Allow listing & watching the TM pods
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get","list","watch"]
+  # Allow reading/writing the HA ConfigMap(s)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: flink-session-ha-binding
+  namespace: streaming
+subjects:
+  - kind: ServiceAccount
+    name: streaming-session-sa
+    namespace: streaming
+roleRef:
+  kind: Role
+  name: flink-session-ha
+  apiGroup: rbac.authorization.k8s.io

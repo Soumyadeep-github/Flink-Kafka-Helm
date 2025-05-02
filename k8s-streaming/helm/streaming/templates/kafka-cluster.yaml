@@ -1,0 +1,33 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: {{ .Release.Name }}-cluster
+  namespace: {{ .Values.namespace }}
+spec:
+  kafka:
+    version: {{ .Values.kafka.version }}
+    replicas: {{ .Values.kafka.replicas }}
+    config:
+      min.insync.replicas: {{ .Values.kafka.config.minInSyncReplicas }}
+      default.replication.factor: {{ .Values.kafka.config.defaultReplicationFactor }}
+      offsets.topic.replication.factor: {{ .Values.kafka.config.offsetsTopicReplicationFactor }}
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    storage:
+#      type: ephemeral
+      type: persistent-claim
+      size: 20Gi
+      deleteClaim: true
+  zookeeper:
+    replicas: {{ .Values.kafka.zookeeperReplicas }}
+    storage:
+#      type: ephemeral
+      type: persistent-claim
+      size: 10Gi
+      deleteClaim: true
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}

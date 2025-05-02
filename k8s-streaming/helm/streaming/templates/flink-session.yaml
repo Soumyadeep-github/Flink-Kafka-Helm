@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.flinkSession.serviceAccount.name }}
+  namespace: {{ .Values.namespace }}
+
+---
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: {{ .Values.namespace }}-session
+  namespace: {{ .Values.namespace }}
+spec:
+  serviceAccount: {{ .Values.flinkSession.serviceAccount.name }}
+  image: {{ .Values.flinkSession.image }}
+  flinkVersion: {{ .Values.flinkSession.flinkVersion }}
+
+  jobManager:
+    resource:
+      memory: "{{ .Values.flinkSession.jobManager.memory }}"
+      cpu: {{ .Values.flinkSession.jobManager.cpu }}
+      spec:
+        volumes:
+          - name: {{ .Values.flinkSession.ha.storageVolumeName }}
+            persistentVolumeClaim:
+              claimName: {{ .Values.flinkSession.pvc.name }}
+        containers:
+          - name: flink-jobmanager
+            ports:
+              - name: rest
+                containerPort: 8081
+            readinessProbe:
+              httpGet:
+                path: /
+                port: rest
+              initialDelaySeconds: 15
+              periodSeconds: 10
+            volumeMounts:
+              - name: {{ .Values.flinkSession.ha.storageVolumeName }}
+                mountPath: "{{ .Values.flinkSession.ha.storageUri }}"
+
+
+  taskManager:
+    resource:
+      memory: "{{ .Values.flinkSession.taskManager.memory }}"
+      cpu: {{ .Values.flinkSession.taskManager.cpu }}
+      spec:
+        volumes:
+          - name: {{ .Values.flinkSession.ha.storageVolumeName }}
+            persistentVolumeClaim:
+              claimName: {{ .Values.flinkSession.pvc.name }}
+        containers:
+          - name: flink-taskmanager
+            volumeMounts:
+              - name: {{ .Values.flinkSession.ha.storageVolumeName }}
+                mountPath: "{{ .Values.flinkSession.ha.storageUri }}"
+
+  flinkConfiguration:
+    taskmanager.numberOfTaskSlots: "{{ .Values.flinkSession.taskSlots }}"
+    high-availability: "kubernetes"
+    high-availability.storageDir: "{{ .Values.flinkSession.ha.storageDir }}"
