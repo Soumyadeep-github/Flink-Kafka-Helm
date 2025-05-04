@@ -17,6 +17,24 @@ kafka:
     name: input-topic
     partitions: 1
     replicas: 1
+  listeners:
+    internal:
+      port: 9092
+      type: internal
+      tls: false
+    external:
+      port: 9095
+      type: cluster-ip
+      tls: false
+#      nodePort: 30092
+#      configuration:
+#        advertisedHost: "192.168.65.3"
+#      authentication:
+#        type: plain
+#  service:
+#    loadBalancerAnnotations:
+#      service.beta.kubernetes.io/gcp-internal-load-balancer: "true"
+
 
 flinkSession:
   haRole:

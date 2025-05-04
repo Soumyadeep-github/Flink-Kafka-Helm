@@ -4,6 +4,12 @@ kind: Role
 metadata:
   name: flink-session-ha
   namespace: streaming
+  labels:
+    app.kubernetes.io/managed-by: "Helm"
+    app.kubernetes.io/instance: "streaming"
+  annotations:
+    meta.helm.sh/release-name: "streaming"
+    meta.helm.sh/release-namespace: "streaming"
 rules:
   # Allow listing & watching the TM pods
   - apiGroups: [""]
@@ -19,6 +25,12 @@ kind: RoleBinding
 metadata:
   name: flink-session-ha-binding
   namespace: streaming
+  labels:
+    app.kubernetes.io/managed-by: "Helm"
+    app.kubernetes.io/instance: "streaming"
+  annotations:
+    meta.helm.sh/release-name: "streaming"
+    meta.helm.sh/release-namespace: "streaming"
 subjects:
   - kind: ServiceAccount
     name: streaming-session-sa

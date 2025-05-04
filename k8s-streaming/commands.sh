@@ -13,6 +13,12 @@ kubectl exec -ti streaming-cluster-kafka-0 -n streaming -- \
     --broker-list streaming-cluster-kafka-bootstrap:9092 \
     --topic input-topic
 
+# Produce messages to the input topic
+kubectl exec -ti streaming-cluster-kafka-0 -n streaming -- \
+  bin/kafka-topics.sh \
+    --bootstrap-server streaming-cluster-kafka-bootstrap:9092 \
+    --list
+
 # Consume messages from the input topic
 kubectl exec -ti streaming-cluster-kafka-0 -n streaming -- \
   bin/kafka-console-consumer.sh \
@@ -25,6 +31,14 @@ kubectl exec -ti streaming-cluster-kafka-0 -n streaming -- \
 kubectl delete all --all -n streaming ; kubectl delete namespace streaming
 kubectl delete all --all -n cert-manager ; kubectl delete namespace cert-manager
 
+for i in cert-manager metallb-system; do
+  kubectl delete all --all -n $i
+  kubectl delete namespace $i
+done
+
+helm upgrade streaming k8s-streaming/helm/streaming \
+  --namespace streaming \
+  --reuse-values
 
 kubectl auth can-i list configmaps \
   --as=system:serviceaccount:streaming::streaming-session-sa \
@@ -48,3 +62,6 @@ kubectl delete rolebinding flink-session-ha-binding -n streaming --ignore-not-fo
 
 kubectl auth can-i list pods --as=system:serviceaccount:streaming:streaming-session-sa -n streaming
 kubectl auth can-i list configmaps --as=system:serviceaccount:streaming:streaming-session-sa -n streaming
+
+kubectl delete role strimzi-cluster-operator -n streaming --ignore-not-found
+kubectl delete rolebinding strimzi-cluster-operator-binding -n streaming --ignore-not-found

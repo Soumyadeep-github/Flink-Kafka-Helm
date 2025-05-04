@@ -9,16 +9,16 @@ resource "null_resource" "k8s_role_apply" {
 }
 
 
-resource "null_resource" "cleanup_streaming_ns" {
-  provisioner "local-exec" {
-    command     = <<-EOT
-      # kubectl patch namespace ${var.namespace_streaming} -p '{"metadata":{"finalizers":[]}}' --type=merge || true
-      kubectl delete all --all -n ${var.namespace_streaming} --ignore-not-found || true
-      kubectl delete namespace ${var.namespace_streaming} --ignore-not-found || true
-    EOT
-    interpreter = ["/bin/bash", "-c"]
-  }
-}
+# resource "null_resource" "cleanup_streaming_ns" {
+#   provisioner "local-exec" {
+#     command     = <<-EOT
+#       # kubectl patch namespace ${var.namespace_streaming} -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+#       kubectl delete all --all -n ${var.namespace_streaming} --ignore-not-found || true
+#       kubectl delete namespace ${var.namespace_streaming} --ignore-not-found || true
+#     EOT
+#     interpreter = ["/bin/bash", "-c"]
+#   }
+# }
 
 # ─── 1️⃣ CREATE 'streaming' namespace ────────────────────────────────────────────
 resource "kubernetes_namespace" "streaming" {
@@ -46,17 +46,126 @@ resource "null_resource" "wait_for_cert_manager" {
   }
 }
 
+resource "null_resource" "metallb_crds" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.10/config/crd/bases/metallb.io_ipaddresspools.yaml  || true
+      kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.10/config/crd/bases/metallb.io_l2advertisements.yaml  || true
+    EOT
+    interpreter = ["/bin/bash","-c"]
+  }
+}
+
+# resource "helm_release" "metallb" {
+#   name       = "metallb"
+#   repository = "https://metallb.github.io/metallb"
+#   chart      = "metallb"
+#   version    = "0.13.10"      # or latest
+#   namespace  = "metallb-system"
+#   create_namespace = true
+#   dependency_update = true
+#   cleanup_on_fail = true
+#   replace = true
+#   skip_crds = true
+#   # force_update = true
+#
+#   depends_on = [
+#         null_resource.metallb_crds
+#     ]
+# }
+#
+# resource "null_resource" "wait_for_metallb" {
+#   depends_on = [ helm_release.metallb ]
+#   provisioner "local-exec" {
+#     command = <<-EOT
+#       kubectl rollout status deployment/metallb-controller   -n metallb-system --timeout=120s
+#       kubectl rollout status daemonset/metallb-speaker       -n metallb-system --timeout=120s
+#     EOT
+#     interpreter = ["/bin/bash", "-c"]
+#   }
+# }
+
+resource "null_resource" "wait_for_metallb_webhook" {
+  depends_on = [ null_resource.install_metallb ]
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash","-c"]
+    command     = <<-EOT
+      kubectl rollout status deployment/controller   -n metallb-system --timeout=120s
+      kubectl rollout status daemonset/speaker       -n metallb-system --timeout=120s
+    EOT
+  }
+}
+
+resource "null_resource" "apply_metallb_pool" {
+  depends_on = [ null_resource.wait_for_metallb_webhook ]
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash","-c"]
+    command     = "kubectl apply -f ${path.module}/../helm/streaming/templates/metallb-pool.yaml"
+  }
+}
+
+
+resource "null_resource" "install_metallb" {
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash","-c"]
+    command     = <<-EOT
+      # 1) CRDs
+      kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.10/config/crd/bases/metallb.io_ipaddresspools.yaml
+      kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.10/config/crd/bases/metallb.io_l2advertisements.yaml
+
+      # 2) Controller & Speaker
+      kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.10/config/manifests/metallb-native.yaml
+    EOT
+  }
+}
+#
+# resource "null_resource" "apply_metallb_pool" {
+#   depends_on = [ null_resource.install_metallb ]
+#   provisioner "local-exec" {
+#     interpreter = ["/bin/bash","-c"]
+#     command     = "kubectl apply -f ${path.module}/../helm/streaming/templates/metallb-pool.yaml"
+#   }
+# }
+#
+#
+# resource "null_resource" "apply_metallb_pool" {
+#   depends_on = [null_resource.wait_for_metallb]
+#   provisioner "local-exec" {
+#     interpreter = ["/bin/bash","-c"]
+#     command     = <<-EOT
+#       # now your own pool + L2Advertisement
+#       kubectl apply -f ${path.module}/../helm/streaming/templates/metallb-pool.yaml
+#     EOT
+#   }
+# }
+
+
+
 # ─── INSTALL Strimzi Kafka Operator ─────────────────────────────────────────────
 resource "null_resource" "install_strimzi" {
-  depends_on = [null_resource.wait_for_cert_manager, kubernetes_namespace.streaming]
+  depends_on = [
+    null_resource.wait_for_cert_manager,
+    null_resource.apply_metallb_pool,
+    kubernetes_namespace.streaming,
+  ]
+  # provisioner "local-exec" {
+  #   command     = <<-EOT
+  #     kubectl wait --for=condition=Established namespace/${var.namespace_streaming} --timeout=60s
+  #     curl -L "https://strimzi.io/install/latest?namespace=${var.namespace_streaming}" \
+  #       | sed 's/namespace:.*/namespace: ${var.namespace_streaming}/' \
+  #       | kubectl apply -f -
+  #   EOT
+  #   interpreter = ["/bin/bash", "-c"]
+  # }
   provisioner "local-exec" {
-    command     = <<-EOT
-      kubectl wait --for=condition=Established namespace/${var.namespace_streaming} --timeout=60s
-      curl -L "https://strimzi.io/install/latest?namespace=${var.namespace_streaming}" \
-        | sed 's/namespace:.*/namespace: ${var.namespace_streaming}/' \
-        | kubectl apply -f -
+    command = <<-EOT
+        kubectl get namespace ${var.namespace_streaming} >/dev/null
+        curl -L \
+            https://github.com/strimzi/strimzi-kafka-operator/releases/download/0.45.0/strimzi-cluster-operator-0.45.0.yaml \
+            | kubectl apply -n ${var.namespace_streaming} -f -
+
     EOT
-    interpreter = ["/bin/bash", "-c"]
+    interpreter = ["/bin/bash","-c"]
   }
 }
 resource "null_resource" "wait_for_strimzi" {
@@ -121,75 +230,12 @@ resource "helm_release" "streaming" {
     null_resource.install_flink_crds,
     null_resource.install_flink_operator,
     null_resource.wait_for_flink_operator,
-    null_resource.k8s_role_apply
+    null_resource.k8s_role_apply,
+    null_resource.apply_metallb_pool
     # kubernetes_role.flink_session_ha,
     # kubernetes_role_binding.flink_session_ha_binding
   ]
 
-  set {
-    name  = "namespace"
-    value = var.namespace_streaming
-  }
-  set {
-    name  = "kafka.replicas"
-    value = var.kafka_replicas
-  }
-  set {
-    name  = "kafka.zookeeperReplicas"
-    value = var.zookeeper_replicas
-  }
-  set {
-    name  = "kafka.topic.partitions"
-    value = var.kafka_topic_partitions
-  }
-  set {
-    name  = "kafka.topic.replicas"
-    value = var.kafka_topic_replicas
-  }
-  set {
-    name  = "kafkaUI.replicas"
-    value = var.kafka_ui_replicas
-  }
-  set {
-    name  = "kafkaUI.image"
-    value = var.kafka_ui_image
-  }
-  set {
-    name  = "flinkSession.image"
-    value = var.flink_image
-  }
-  set {
-    name  = "flinkSession.flinkVersion"
-    value = var.flink_version
-  }
-  set {
-    name  = "flinkSession.jobManager.memory"
-    value = var.flink_jobmanager_memory
-  }
-  set {
-    name  = "flinkSession.jobManager.cpu"
-    value = var.flink_jobmanager_cpu
-  }
-  set {
-    name  = "flinkSession.taskManager.memory"
-    value = var.flink_taskmanager_memory
-  }
-  set {
-    name  = "flinkSession.taskManager.cpu"
-    value = var.flink_taskmanager_cpu
-  }
-  set {
-    name  = "flinkSession.taskSlots"
-    value = var.flink_task_slots
-  }
-  set {
-    name  = "flinkSession.serviceAccount.create"
-    value = "true" # or "false" if you want to use a pre-existing SA
-  }
-  set {
-    name  = "flinkSession.serviceAccount.name"
-    value = "streaming-session-sa"
-  }
 }
 
 
