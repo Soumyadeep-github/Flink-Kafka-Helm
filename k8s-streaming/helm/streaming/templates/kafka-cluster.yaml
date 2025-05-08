@@ -1,7 +1,7 @@
 apiVersion: kafka.strimzi.io/v1beta2
 kind: Kafka
 metadata:
-  name: {{ .Release.Name }}-cluster
+  name: {{ .Values.namespace }}-cluster
   namespace: {{ .Values.namespace }}
 spec:
   kafka:
@@ -11,20 +11,34 @@ spec:
       min.insync.replicas: {{ .Values.kafka.config.minInSyncReplicas }}
       default.replication.factor: {{ .Values.kafka.config.defaultReplicationFactor }}
       offsets.topic.replication.factor: {{ .Values.kafka.config.offsetsTopicReplicationFactor }}
+      listener.security.protocol.map: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      inter.broker.listener.name: PLAINTEXT
     listeners:
       - name: plain
         port: 9092
         type: internal
         tls: false
+      - configuration:
+          bootstrap:
+            nodePort: 30092
+          brokers:
+          - broker: 0
+            nodePort: 30093
+          - broker: 1
+            nodePort: 30094
+          - broker: 2
+            nodePort: 30095
+        name: external
+        port: 9095
+        tls: false
+        type: nodeport
     storage:
-#      type: ephemeral
       type: persistent-claim
       size: 20Gi
       deleteClaim: true
   zookeeper:
     replicas: {{ .Values.kafka.zookeeperReplicas }}
     storage:
-#      type: ephemeral
       type: persistent-claim
       size: 10Gi
       deleteClaim: true
